@@ -28,8 +28,17 @@ async function runSync() {
         polarTokens.access_token,
         polarTokens.provider_user_id
       );
+      console.log("POLAR_EXERCISES_RAW", JSON.stringify(exercises).slice(0, 2000));
       for (const ex of exercises) {
-        await upsertActivity(normalizePolarExercise(ex));
+        const normalized = normalizePolarExercise(ex);
+        console.log("POLAR_NORMALIZED", JSON.stringify(normalized).slice(0, 500));
+        try {
+          await upsertActivity(normalized);
+          console.log("POLAR_UPSERT_OK", normalized.external_id);
+        } catch (upsertErr) {
+          console.error("POLAR_UPSERT_FAILED", normalized.external_id, upsertErr.message);
+          throw upsertErr;
+        }
       }
       results.polar = { new_activities: exercises.length };
       await logSync("polar", "ok", `${exercises.length} nieuwe activiteiten`);
