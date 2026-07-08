@@ -71,5 +71,6 @@ async function runSync() {
     await logSync("strava", "error", e.message);
   }
 
+  console.log("SYNC_RESULT", JSON.stringify(results));
   return NextResponse.json(results);
 }

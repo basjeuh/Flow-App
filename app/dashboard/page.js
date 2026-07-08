@@ -41,10 +41,14 @@ export default function Dashboard() {
     setLoading(false);
   }
 
+  const [syncResult, setSyncResult] = useState(null);
+
   async function sync() {
     setSyncing(true);
     try {
-      await fetch("/api/sync", { method: "POST" });
+      const res = await fetch("/api/sync", { method: "POST" });
+      const data = await res.json();
+      setSyncResult(data);
       await load();
     } finally {
       setSyncing(false);
@@ -107,6 +111,23 @@ export default function Dashboard() {
       </div>
 
       {error && <p style={{ color: "var(--polar)" }}>Fout: {error}</p>}
+
+      {syncResult && (
+        <pre
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            borderRadius: 10,
+            padding: 14,
+            fontSize: 12,
+            color: "var(--text-dim)",
+            overflowX: "auto",
+            marginBottom: 24,
+          }}
+        >
+          {JSON.stringify(syncResult, null, 2)}
+        </pre>
+      )}
 
       {loading ? (
         <p className="empty">Laden...</p>
