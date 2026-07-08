@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { upsertActivity } from "../../../lib/db";
+import { upsertActivity, query } from "../../../lib/db";
 import { parseTcx, parseGpx } from "../../../lib/importParsers";
 
 export const maxDuration = 60;
@@ -44,7 +44,10 @@ export async function POST(request) {
       }
     }
 
-    return NextResponse.json({ imported, errors });
+    const countRes = await query(`select count(*)::int as n from activities`);
+    console.log("IMPORT_DEBUG total_rows_now", countRes.rows[0].n, "db_host_hint", process.env.DATABASE_URL?.split("@")[1]?.split("/")[0]);
+
+    return NextResponse.json({ imported, errors, total_rows_now: countRes.rows[0].n });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

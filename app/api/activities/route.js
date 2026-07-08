@@ -10,7 +10,10 @@ export async function GET() {
        order by start_time desc
        limit 500`
     );
-    return NextResponse.json({ activities: res.rows });
+    return NextResponse.json({
+      activities: res.rows,
+      _debug_db_host: process.env.DATABASE_URL?.split("@")[1]?.split("/")[0],
+    });
   } catch (e) {
     return NextResponse.json({ error: e.message, activities: [] }, { status: 500 });
   }
