@@ -42,6 +42,9 @@ export default function Home() {
       <p style={{ marginTop: 40 }}>
         <a className="btn" href="/dashboard">
           Naar dashboard →
+        </a>{" "}
+        <a className="btn" href="/import">
+          Oude trainingen importeren (TCX/GPX)
         </a>
       </p>
     </main>
