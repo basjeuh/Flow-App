@@ -223,6 +223,43 @@ export default function Dashboard() {
     return weeks;
   }, [activities]);
 
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = deze week, -1 = vorige week, ...
+
+  function getWeekRange(offset) {
+    const now = new Date();
+    const day = now.getDay() || 7; // maandag = start van de week
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(now.getDate() - day + 1 + offset * 7);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return { start: monday, end: sunday };
+  }
+
+  const selectedWeek = useMemo(() => {
+    const { start, end } = getWeekRange(weekOffset);
+    const weekActivities = activities.filter((a) => {
+      const t = new Date(a.start_time);
+      return t >= start && t <= end;
+    });
+    const km = weekActivities.reduce((s, a) => s + (Number(a.distance_m) || 0), 0) / 1000;
+    const time = weekActivities.reduce((s, a) => s + (Number(a.duration_s) || 0), 0);
+    const byCat = {};
+    for (const a of weekActivities) {
+      const cat = sportCategory(a.sport);
+      byCat[cat] = (byCat[cat] || 0) + (Number(a.distance_m) || 0) / 1000;
+    }
+    return { start, end, activities: weekActivities, km, time, byCat };
+  }, [activities, weekOffset]);
+
+  const oldestActivityDate = useMemo(() => {
+    if (activities.length === 0) return null;
+    return activities.reduce((min, a) => (new Date(a.start_time) < min ? new Date(a.start_time) : min), new Date());
+  }, [activities]);
+
+  const canGoOlder = !oldestActivityDate || getWeekRange(weekOffset - 1).end >= oldestActivityDate;
+
   const stats = useMemo(() => {
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 86400000);
@@ -245,11 +282,75 @@ export default function Dashboard() {
       <div className="eyebrow">dashboard</div>
       <h1 className="hero" style={{ fontSize: "32px" }}>Trainingsoverzicht</h1>
 
-      <div className="stat-row">
-        <div className="stat"><div className="stat-label">activiteiten</div><div className="stat-value readout">{stats.count}</div></div>
-        <div className="stat"><div className="stat-label">km deze week</div><div className="stat-value readout">{stats.weekKm}</div></div>
-        <div className="stat"><div className="stat-label">tijd deze week</div><div className="stat-value readout">{stats.weekTime}</div></div>
-        <div className="stat"><div className="stat-label">gem. hr (laatste 10)</div><div className="stat-value readout">{stats.avgHr}</div></div>
+      <div className="stat-row" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="stat" style={{ padding: 20 }}>
+          <div className="top-nav" style={{ marginBottom: 14 }}>
+            <button className="btn" onClick={() => setWeekOffset((w) => w - 1)}>← vorige week</button>
+            <div className="stat-label" style={{ fontSize: 13 }}>
+              {selectedWeek.start.toLocaleDateString("nl-NL", { day: "2-digit", month: "short" })}
+              {" – "}
+              {selectedWeek.end.toLocaleDateString("nl-NL", { day: "2-digit", month: "short", year: "numeric" })}
+              {weekOffset === 0 && "  ·  deze week"}
+            </div>
+            <button className="btn" onClick={() => setWeekOffset((w) => w + 1)} disabled={weekOffset >= 0}>
+              volgende week →
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 16 }}>
+            <div>
+              <div className="stat-label">km</div>
+              <div className="stat-value readout">{selectedWeek.km.toFixed(1)}</div>
+            </div>
+            <div>
+              <div className="stat-label">tijd</div>
+              <div className="stat-value readout">{fmtDuration(selectedWeek.time)}</div>
+            </div>
+            <div>
+              <div className="stat-label">activiteiten</div>
+              <div className="stat-value readout">{selectedWeek.activities.length}</div>
+            </div>
+            {Object.entries(selectedWeek.byCat).map(([cat, km]) => (
+              <div key={cat}>
+                <div className="stat-label">{cat}</div>
+                <div className="stat-value readout" style={{ color: CATEGORY_COLOR[cat], fontSize: 20 }}>
+                  {km.toFixed(1)} km
+                </div>
+              </div>
+            ))}
+          </div>
+          {!canGoOlder && (
+            <div className="card-desc" style={{ marginTop: 10 }}>Geen oudere trainingen beschikbaar.</div>
+          )}
+          {selectedWeek.activities.length > 0 && (
+            <div className="activity-list" style={{ marginTop: 16 }}>
+              {selectedWeek.activities.map((a) => (
+                <div className="activity-row" key={`wk-${a.provider}-${a.id}`}>
+                  <span className={`dot ${a.provider === "polar" ? "polar" : "garmin"}`} />
+                  <div>
+                    <div className="activity-sport">{a.sport || a.source_sport || "activiteit"}</div>
+                    <div className="activity-date">{fmtDate(a.start_time)}</div>
+                  </div>
+                  <div className="readout hide-mobile">{fmtDistance(a.distance_m)}</div>
+                  <div className="readout hide-mobile">{fmtDuration(a.duration_s)}</div>
+                  <div className="readout hide-mobile">{a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : "–"}</div>
+                  <div className="readout">{a.training_load ? Math.round(a.training_load) : "–"}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="stat">
+          <div style={{ display: "flex", gap: 24 }}>
+            <div>
+              <div className="stat-label">totaal activiteiten</div>
+              <div className="stat-value readout">{stats.count}</div>
+            </div>
+            <div>
+              <div className="stat-label">gem. hr (laatste 10)</div>
+              <div className="stat-value readout">{stats.avgHr}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {error && <p style={{ color: "var(--polar)" }}>Fout: {error}</p>}
