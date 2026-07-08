@@ -40,3 +40,16 @@ create table if not exists sync_log (
   detail text,
   created_at timestamptz not null default now()
 );
+
+-- Vrij instelbare doelen, bv. "500 km hardlopen voor 1 oktober" of
+-- "20 keer fietsen deze maand". sport = null betekent: alle sporten samen.
+create table if not exists goals (
+  id bigserial primary key,
+  title text not null,
+  sport text,                                -- null = alle sporten
+  metric text not null,                       -- 'distance_m' | 'duration_s' | 'count'
+  target_value numeric not null,
+  start_date date not null,
+  end_date date not null,
+  created_at timestamptz not null default now()
+);
