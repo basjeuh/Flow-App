@@ -19,6 +19,7 @@ export async function GET() {
     );
     return NextResponse.json({ goals: withProgress });
   } catch (e) {
+    console.error("GOALS_GET_ERROR", e.message, e.stack);
     return NextResponse.json({ error: e.message, goals: [] }, { status: 500 });
   }
 }
