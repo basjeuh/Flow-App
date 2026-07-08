@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { query } from "../../../lib/db";
 
 export async function GET() {
@@ -10,10 +11,10 @@ export async function GET() {
        order by start_time desc
        limit 500`
     );
-    return NextResponse.json({
-      activities: res.rows,
-      _debug_db_host: process.env.DATABASE_URL?.split("@")[1]?.split("/")[0],
-    });
+    return NextResponse.json(
+      { activities: res.rows },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (e) {
     return NextResponse.json({ error: e.message, activities: [] }, { status: 500 });
   }

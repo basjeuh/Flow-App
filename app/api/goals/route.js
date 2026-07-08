@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { listGoals, createGoal, getGoalProgress } from "../../../lib/db";
 
 const ALLOWED_METRICS = ["distance_m", "duration_s", "count"];
@@ -8,18 +9,15 @@ export async function GET() {
     const goals = await listGoals();
     const withProgress = await Promise.all(
       goals.map(async (g) => {
-        const current = await getGoalProgress(
-          g.sport,
-          g.metric,
-          g.start_date,
-          g.end_date
-        );
+        const current = await getGoalProgress(g.sport, g.metric, g.start_date, g.end_date);
         return { ...g, current };
       })
     );
-    return NextResponse.json({ goals: withProgress });
+    return NextResponse.json(
+      { goals: withProgress },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (e) {
-    console.error("GOALS_GET_ERROR", e.message, e.stack);
     return NextResponse.json({ error: e.message, goals: [] }, { status: 500 });
   }
 }

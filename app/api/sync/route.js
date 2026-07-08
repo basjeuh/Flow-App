@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { getTokens, saveTokens, upsertActivity, logSync } from "../../../lib/db";
 import { fetchNewPolarExercises, normalizePolarExercise } from "../../../lib/polar";
 import {
@@ -9,10 +10,10 @@ import {
 
 export const maxDuration = 60;
 
+// Vercel Cron roept endpoints aan met GET; de dashboard-knop gebruikt POST.
 export async function GET() {
   return runSync();
 }
-
 export async function POST() {
   return runSync();
 }
@@ -28,17 +29,8 @@ async function runSync() {
         polarTokens.access_token,
         polarTokens.provider_user_id
       );
-      console.log("POLAR_EXERCISES_RAW", JSON.stringify(exercises).slice(0, 2000));
       for (const ex of exercises) {
-        const normalized = normalizePolarExercise(ex);
-        console.log("POLAR_NORMALIZED", JSON.stringify(normalized).slice(0, 500));
-        try {
-          await upsertActivity(normalized);
-          console.log("POLAR_UPSERT_OK", normalized.external_id);
-        } catch (upsertErr) {
-          console.error("POLAR_UPSERT_FAILED", normalized.external_id, upsertErr.message);
-          throw upsertErr;
-        }
+        await upsertActivity(normalizePolarExercise(ex));
       }
       results.polar = { new_activities: exercises.length };
       await logSync("polar", "ok", `${exercises.length} nieuwe activiteiten`);
@@ -80,6 +72,5 @@ async function runSync() {
     await logSync("strava", "error", e.message);
   }
 
-  console.log("SYNC_RESULT", JSON.stringify(results));
-  return NextResponse.json(results);
+  return NextResponse.json(results, { headers: { "Cache-Control": "no-store, max-age=0" } });
 }

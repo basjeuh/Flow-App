@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { upsertActivity, query } from "../../../lib/db";
+export const dynamic = "force-dynamic";
+import { upsertActivity } from "../../../lib/db";
 
 // Verwacht al vooraf (client-side, in de browser) geparste activiteiten,
 // niet de ruwe TCX/GPX-bestanden zelf. Dit voorkomt dat grote Garmin-exports
-// (met dichte GPS/HR-sampledata) tegen Vercel's request-bodylimiet aanlopen.
+// tegen Vercel's request-bodylimiet aanlopen.
 export async function POST(request) {
   try {
     const { activities } = await request.json();
@@ -26,8 +27,7 @@ export async function POST(request) {
       }
     }
 
-    const countRes = await query(`select count(*)::int as n from activities`);
-    return NextResponse.json({ imported, errors, total_rows_now: countRes.rows[0].n });
+    return NextResponse.json({ imported, errors });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
