@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTokens, saveTokens, upsertActivity, logSync } from "../../../lib/db";
-import {
-  fetchTrainingSessions,
-  normalizePolarSession,
-  refreshPolarToken,
-} from "../../../lib/polar";
+import { fetchNewPolarExercises, normalizePolarExercise } from "../../../lib/polar";
 import {
   fetchStravaActivities,
   normalizeStravaActivity,
@@ -13,8 +9,6 @@ import {
 
 export const maxDuration = 60;
 
-// Vercel Cron roept endpoints aan met GET; de dashboard-knop gebruikt POST.
-// Beide doen hetzelfde.
 export async function GET() {
   return runSync();
 }
@@ -28,29 +22,17 @@ async function runSync() {
 
   // --- Polar ---
   try {
-    let polarTokens = await getTokens("polar");
+    const polarTokens = await getTokens("polar");
     if (polarTokens) {
-      // Polar v4 access tokens zijn ~12 uur geldig; ververs indien nodig.
-      if (polarTokens.expires_at && new Date(polarTokens.expires_at) < new Date()) {
-        if (!polarTokens.refresh_token) {
-          throw new Error("Polar-token verlopen en geen refresh_token beschikbaar, opnieuw koppelen nodig.");
-        }
-        const refreshed = await refreshPolarToken(polarTokens.refresh_token);
-        await saveTokens("polar", {
-          accessToken: refreshed.access_token,
-          refreshToken: refreshed.refresh_token || polarTokens.refresh_token,
-          expiresAt: new Date(Date.now() + (refreshed.expires_in || 43000) * 1000).toISOString(),
-          providerUserId: null,
-        });
-        polarTokens = await getTokens("polar");
+      const exercises = await fetchNewPolarExercises(
+        polarTokens.access_token,
+        polarTokens.provider_user_id
+      );
+      for (const ex of exercises) {
+        await upsertActivity(normalizePolarExercise(ex));
       }
-
-      const sessions = await fetchTrainingSessions(polarTokens.access_token);
-      for (const session of sessions) {
-        await upsertActivity(normalizePolarSession(session));
-      }
-      results.polar = { new_activities: sessions.length };
-      await logSync("polar", "ok", `${sessions.length} trainingssessies`);
+      results.polar = { new_activities: exercises.length };
+      await logSync("polar", "ok", `${exercises.length} nieuwe activiteiten`);
     } else {
       results.polar = { skipped: "niet gekoppeld" };
     }
@@ -63,7 +45,6 @@ async function runSync() {
   try {
     let stravaTokens = await getTokens("strava");
     if (stravaTokens) {
-      // Ververs token indien nodig (Strava tokens verlopen na 6 uur)
       if (stravaTokens.expires_at && new Date(stravaTokens.expires_at) < new Date()) {
         const refreshed = await refreshStravaToken(stravaTokens.refresh_token);
         await saveTokens("strava", {
@@ -75,8 +56,6 @@ async function runSync() {
         stravaTokens = await getTokens("strava");
       }
 
-      // Haal alles op sinds de laatste keer syncen (met wat marge).
-      // Bij de allereerste sync pakken we een ruime historie (~2 jaar).
       const afterUnix = Math.floor(new Date(stravaTokens.updated_at).getTime() / 1000) - 86400 * 730;
       const activities = await fetchStravaActivities(stravaTokens.access_token, afterUnix);
       for (const act of activities) {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { exchangePolarCode } from "../../../../../lib/polar";
+import { exchangePolarCode, registerPolarUser } from "../../../../../lib/polar";
 import { saveTokens } from "../../../../../lib/db";
 
 export async function GET(request) {
@@ -18,12 +18,14 @@ export async function GET(request) {
 
   try {
     const token = await exchangePolarCode(code, redirectUri);
+    const memberId = `bas-${token.x_user_id}`;
+    await registerPolarUser(token.access_token, memberId);
 
     await saveTokens("polar", {
       accessToken: token.access_token,
-      refreshToken: token.refresh_token || null,
-      expiresAt: new Date(Date.now() + (token.expires_in || 43000) * 1000).toISOString(),
-      providerUserId: null,
+      refreshToken: null, // klassieke Polar access tokens verlopen niet
+      expiresAt: null,
+      providerUserId: String(token.x_user_id),
     });
 
     return NextResponse.redirect(`${url.origin}/dashboard?connected=polar`);
