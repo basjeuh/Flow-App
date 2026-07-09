@@ -44,6 +44,14 @@ function sportCategory(sport) {
 }
 const CATEGORY_COLOR = { hardlopen: "var(--garmin)", fietsen: "var(--polar)", overig: "var(--accent)" };
 
+// Afstandscategorieën voor de Running Index-ontwikkeling.
+const DISTANCE_CATEGORIES = [
+  { key: "≤5km", test: (m) => m <= 5000, color: "var(--accent)" },
+  { key: "6-10km", test: (m) => m > 5000 && m <= 10000, color: "var(--garmin)" },
+  { key: "11-21km", test: (m) => m > 10000 && m <= 21100, color: "var(--polar)" },
+  { key: "22km+", test: (m) => m > 21100, color: "#e85d75" },
+];
+
 function isoWeekKey(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const day = d.getUTCDay() || 7;
@@ -260,6 +268,17 @@ export default function Dashboard() {
 
   const canGoOlder = !oldestActivityDate || getWeekRange(weekOffset - 1).end >= oldestActivityDate;
 
+  // --- Running Index-ontwikkeling per afstandscategorie ---
+  const runningIndexData = useMemo(() => {
+    return DISTANCE_CATEGORIES.map((cat) => {
+      const points = activities
+        .filter((a) => sportCategory(a.sport) === "hardlopen" && a.running_index && a.distance_m && cat.test(Number(a.distance_m)))
+        .map((a) => ({ date: a.start_time.slice(0, 10), index: Number(a.running_index) }))
+        .sort((a, b) => (a.date > b.date ? 1 : -1));
+      return { ...cat, points };
+    });
+  }, [activities]);
+
   const stats = useMemo(() => {
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 86400000);
@@ -412,6 +431,42 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
+          {/* Running Index-ontwikkeling per afstandscategorie */}
+          {runningIndexData.some((c) => c.points.length > 0) && (
+            <>
+              <h2 className="card-title" style={{ marginBottom: 4 }}>Running Index per afstandscategorie</h2>
+              <p className="card-desc" style={{ marginBottom: 16 }}>
+                Polar's hardloop-fitnessindicator, uitgesplitst per afstand &mdash; alleen beschikbaar
+                voor runs die rechtstreeks via de Polar-koppeling zijn opgehaald (niet bij TCX/GPX-import).
+              </p>
+              <div className="connect-grid" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 40 }}>
+                {runningIndexData.filter((c) => c.points.length > 0).map((c) => (
+                  <div key={c.key} className="connect-card" style={{ gap: 8 }}>
+                    <div className="card-title">
+                      <span className="dot" style={{ background: c.color, boxShadow: `0 0 10px ${c.color}` }} />
+                      {c.key}
+                      <span className="card-desc" style={{ marginLeft: "auto" }}>{c.points.length} run(s)</span>
+                    </div>
+                    {c.points.length === 1 ? (
+                      <div className="readout" style={{ fontSize: 26 }}>{c.points[0].index}</div>
+                    ) : (
+                      <div style={{ width: "100%", height: 120 }}>
+                        <ResponsiveContainer>
+                          <LineChart data={c.points}>
+                            <XAxis dataKey="date" tick={{ fill: "var(--text-dim)", fontSize: 9 }} tickFormatter={(d) => d.slice(5)} />
+                            <YAxis domain={["dataMin - 2", "dataMax + 2"]} tick={{ fill: "var(--text-dim)", fontSize: 10 }} width={28} />
+                            <Tooltip contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, fontSize: 12 }} />
+                            <Line type="monotone" dataKey="index" stroke={c.color} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* Consistentie-heatmap */}
           <h2 className="card-title" style={{ marginBottom: 12 }}>Consistentie (laatste 12 weken)</h2>

@@ -26,6 +26,7 @@ create table if not exists activities (
   elevation_gain_m numeric,
   calories numeric,
   training_load numeric,                    -- polar cardio load / garmin training effect indien beschikbaar
+  running_index numeric,                    -- polar's hardloop-fitnessindicator (alleen bij live AccessLink-sync)
   raw jsonb,                                -- volledige originele payload, voor latere uitbreiding
   created_at timestamptz not null default now(),
   unique (provider, external_id)
