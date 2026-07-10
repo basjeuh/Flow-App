@@ -168,7 +168,7 @@ function ActivityRow({ a }) {
                     {cat !== "hardlopen" && (
                       <Line yAxisId="pace" type="monotone" dataKey="speedKmh" name="snelheid (km/u)" stroke="var(--garmin)" dot={false} strokeWidth={1.5} connectNulls />
                     )}
-                    {chartData.some((d) => d.watts) && (
+                    {cat !== "hardlopen" && chartData.some((d) => d.watts) && (
                       <Line yAxisId="hr" type="monotone" dataKey="watts" name="vermogen (W)" stroke="var(--polar)" dot={false} strokeWidth={1} />
                     )}
                   </LineChart>
