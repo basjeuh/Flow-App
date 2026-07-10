@@ -79,6 +79,27 @@ function ActivityRow({ a }) {
           <div><div className="stat-label">calorieën</div><div className="readout" style={{ fontSize: 14 }}>{a.calories ? Math.round(a.calories) : "–"}</div></div>
           {a.training_load != null && <div><div className="stat-label">training load</div><div className="readout" style={{ fontSize: 14 }}>{Number(a.training_load).toFixed(1)}</div></div>}
           {a.running_index != null && <div><div className="stat-label">running index</div><div className="readout" style={{ fontSize: 14 }}>{a.running_index}</div></div>}
+          {a.laps && a.laps.length > 0 && (
+            <div style={{ gridColumn: "1/-1" }}>
+              <div className="stat-label" style={{ marginBottom: 8 }}>per-kilometer splits</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr 1fr", gap: 8, fontSize: 11, color: "var(--text-dim)" }}>
+                  <div>#</div><div>afstand</div><div>tijd / tempo</div><div>hartslag</div>
+                </div>
+                {a.laps.map((lap, i) => {
+                  const lapPace = lap.distance_m && lap.duration_s ? lap.duration_s / (lap.distance_m / 1000) : null;
+                  return (
+                    <div key={i} className="readout" style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr 1fr", gap: 8, fontSize: 13 }}>
+                      <div>{i + 1}</div>
+                      <div>{fmtDistance(lap.distance_m)}</div>
+                      <div>{fmtDuration(lap.duration_s)}{lapPace ? ` · ${fmtPace(lapPace)}` : ""}</div>
+                      <div>{lap.avg_hr ? `${Math.round(lap.avg_hr)} bpm` : "–"}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div style={{ gridColumn: "1/-1", marginTop: 4 }}>
             <button className="btn" style={{ fontSize: 11, padding: "4px 10px" }} onClick={(e) => { e.stopPropagation(); setShowRaw((v) => !v); }}>
               {showRaw ? "verberg ruwe data" : "toon ruwe data"}
