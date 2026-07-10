@@ -82,6 +82,7 @@ function ActivityRow({ a }) {
         hr: cur.hr,
         cadence: cur.cadence,
         watts: cur.watts,
+        speedKmh: cur.speed_ms != null ? +(cur.speed_ms * 3.6).toFixed(1) : null,
         pace: paceMinKm && paceMinKm < 15 ? +paceMinKm.toFixed(2) : null,
       });
     }
@@ -163,6 +164,9 @@ function ActivityRow({ a }) {
                     <Line yAxisId="pace" type="monotone" dataKey="pace" name="tempo (min/km)" stroke="var(--accent)" dot={false} strokeWidth={1.5} connectNulls />
                     {chartData.some((d) => d.watts) && (
                       <Line yAxisId="hr" type="monotone" dataKey="watts" name="vermogen (W)" stroke="var(--polar)" dot={false} strokeWidth={1} />
+                    )}
+                    {!chartData.some((d) => d.watts) && chartData.some((d) => d.speedKmh) && (
+                      <Line yAxisId="pace" type="monotone" dataKey="speedKmh" name="snelheid (km/u)" stroke="var(--garmin)" dot={false} strokeWidth={1.5} connectNulls />
                     )}
                   </LineChart>
                 </ResponsiveContainer>
