@@ -45,14 +45,55 @@ function fmtDateTime(iso) {
 function ActivityRow({ a }) {
   const [open, setOpen] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
+  const [samples, setSamples] = useState(null);
+  const [loadingSamples, setLoadingSamples] = useState(false);
   const pace = a.distance_m && a.duration_s ? a.duration_s / (Number(a.distance_m) / 1000) : null;
+
+  async function toggleOpen() {
+    const willOpen = !open;
+    setOpen(willOpen);
+    if (willOpen && samples === null) {
+      setLoadingSamples(true);
+      try {
+        const res = await fetch(`/api/activities/${a.id}/samples`);
+        const data = await res.json();
+        setSamples(data.samples || []);
+      } catch {
+        setSamples([]);
+      } finally {
+        setLoadingSamples(false);
+      }
+    }
+  }
+
+  // Downsamplen naar ~150 punten voor een vlotte grafiek, en tempo per punt berekenen.
+  const chartData = useMemo(() => {
+    if (!samples || samples.length === 0) return [];
+    const step = Math.max(1, Math.floor(samples.length / 150));
+    const out = [];
+    for (let i = step; i < samples.length; i += step) {
+      const cur = samples[i];
+      const prev = samples[i - step];
+      const dDist = (cur.dist ?? 0) - (prev.dist ?? 0);
+      const dT = cur.t - prev.t;
+      const paceMinKm = dDist > 0 && dT > 0 ? (dT / dDist) * (1000 / 60) : null;
+      out.push({
+        t: cur.t,
+        hr: cur.hr,
+        cadence: cur.cadence,
+        watts: cur.watts,
+        pace: paceMinKm && paceMinKm < 15 ? +paceMinKm.toFixed(2) : null,
+      });
+    }
+    return out;
+  }, [samples]);
 
   return (
     <div style={{ borderBottom: "1px solid var(--line)" }}>
       <div
         className="activity-row"
         style={{ borderBottom: "none", cursor: "pointer" }}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
       >
         <span className={`dot ${a.provider === "polar" ? "polar" : "garmin"}`} />
         <div>
@@ -79,6 +120,7 @@ function ActivityRow({ a }) {
           <div><div className="stat-label">calorieën</div><div className="readout" style={{ fontSize: 14 }}>{a.calories ? Math.round(a.calories) : "–"}</div></div>
           {a.training_load != null && <div><div className="stat-label">training load</div><div className="readout" style={{ fontSize: 14 }}>{Number(a.training_load).toFixed(1)}</div></div>}
           {a.running_index != null && <div><div className="stat-label">running index</div><div className="readout" style={{ fontSize: 14 }}>{a.running_index}</div></div>}
+
           {a.laps && a.laps.length > 0 && (
             <div style={{ gridColumn: "1/-1" }}>
               <div className="stat-label" style={{ marginBottom: 8 }}>per-kilometer splits</div>
@@ -100,6 +142,34 @@ function ActivityRow({ a }) {
               </div>
             </div>
           )}
+
+          <div style={{ gridColumn: "1/-1" }}>
+            <div className="stat-label" style={{ marginBottom: 8 }}>verloop tijdens de training</div>
+            {loadingSamples ? (
+              <div className="card-desc">laden...</div>
+            ) : chartData.length === 0 ? (
+              <div className="card-desc">geen seconde-voor-seconde data beschikbaar voor deze activiteit.</div>
+            ) : (
+              <div style={{ width: "100%", height: 220 }}>
+                <ResponsiveContainer>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+                    <XAxis dataKey="t" tick={{ fill: "var(--text-dim)", fontSize: 10 }} tickFormatter={(s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`} />
+                    <YAxis yAxisId="hr" tick={{ fill: "var(--text-dim)", fontSize: 10 }} width={32} />
+                    <YAxis yAxisId="pace" orientation="right" reversed tick={{ fill: "var(--text-dim)", fontSize: 10 }} width={32} />
+                    <Tooltip contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Line yAxisId="hr" type="monotone" dataKey="hr" name="hartslag" stroke="#e85d75" dot={false} strokeWidth={1.5} />
+                    <Line yAxisId="pace" type="monotone" dataKey="pace" name="tempo (min/km)" stroke="var(--accent)" dot={false} strokeWidth={1.5} connectNulls />
+                    {chartData.some((d) => d.watts) && (
+                      <Line yAxisId="hr" type="monotone" dataKey="watts" name="vermogen (W)" stroke="var(--polar)" dot={false} strokeWidth={1} />
+                    )}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
           <div style={{ gridColumn: "1/-1", marginTop: 4 }}>
             <button className="btn" style={{ fontSize: 11, padding: "4px 10px" }} onClick={(e) => { e.stopPropagation(); setShowRaw((v) => !v); }}>
               {showRaw ? "verberg ruwe data" : "toon ruwe data"}
