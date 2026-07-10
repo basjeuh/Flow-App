@@ -48,6 +48,7 @@ function ActivityRow({ a }) {
   const [samples, setSamples] = useState(null);
   const [loadingSamples, setLoadingSamples] = useState(false);
   const pace = a.distance_m && a.duration_s ? a.duration_s / (Number(a.distance_m) / 1000) : null;
+  const cat = sportCategory(a.sport);
 
   async function toggleOpen() {
     const willOpen = !open;
@@ -82,12 +83,12 @@ function ActivityRow({ a }) {
         hr: cur.hr,
         cadence: cur.cadence,
         watts: cur.watts,
-        speedKmh: cur.speed_ms != null ? +(cur.speed_ms * 3.6).toFixed(1) : null,
-        pace: paceMinKm && paceMinKm < 15 ? +paceMinKm.toFixed(2) : null,
+        speedKmh: cat === "fietsen" && cur.speed_ms != null ? +(cur.speed_ms * 3.6).toFixed(1) : null,
+        pace: cat !== "fietsen" && paceMinKm && paceMinKm < 15 ? +paceMinKm.toFixed(2) : null,
       });
     }
     return out;
-  }, [samples]);
+  }, [samples, cat]);
 
   return (
     <div style={{ borderBottom: "1px solid var(--line)" }}>
@@ -157,16 +158,18 @@ function ActivityRow({ a }) {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
                     <XAxis dataKey="t" tick={{ fill: "var(--text-dim)", fontSize: 10 }} tickFormatter={(s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`} />
                     <YAxis yAxisId="hr" tick={{ fill: "var(--text-dim)", fontSize: 10 }} width={32} />
-                    <YAxis yAxisId="pace" orientation="right" reversed tick={{ fill: "var(--text-dim)", fontSize: 10 }} width={32} />
+                    <YAxis yAxisId="pace" orientation="right" reversed={cat !== "fietsen"} tick={{ fill: "var(--text-dim)", fontSize: 10 }} width={32} />
                     <Tooltip contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, fontSize: 12 }} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Line yAxisId="hr" type="monotone" dataKey="hr" name="hartslag" stroke="#e85d75" dot={false} strokeWidth={1.5} />
-                    <Line yAxisId="pace" type="monotone" dataKey="pace" name="tempo (min/km)" stroke="var(--accent)" dot={false} strokeWidth={1.5} connectNulls />
+                    {cat !== "fietsen" && (
+                      <Line yAxisId="pace" type="monotone" dataKey="pace" name="tempo (min/km)" stroke="var(--accent)" dot={false} strokeWidth={1.5} connectNulls />
+                    )}
+                    {cat === "fietsen" && (
+                      <Line yAxisId="pace" type="monotone" dataKey="speedKmh" name="snelheid (km/u)" stroke="var(--garmin)" dot={false} strokeWidth={1.5} connectNulls />
+                    )}
                     {chartData.some((d) => d.watts) && (
                       <Line yAxisId="hr" type="monotone" dataKey="watts" name="vermogen (W)" stroke="var(--polar)" dot={false} strokeWidth={1} />
-                    )}
-                    {!chartData.some((d) => d.watts) && chartData.some((d) => d.speedKmh) && (
-                      <Line yAxisId="pace" type="monotone" dataKey="speedKmh" name="snelheid (km/u)" stroke="var(--garmin)" dot={false} strokeWidth={1.5} connectNulls />
                     )}
                   </LineChart>
                 </ResponsiveContainer>
