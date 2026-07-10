@@ -15,14 +15,17 @@ import {
 } from "recharts";
 
 function fmtDuration(sec) {
-  if (!sec) return "–";
+  if (sec == null) return "–";
   const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}u` : `${m}m`;
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.round(sec % 60);
+  return h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    : `${m}:${String(s).padStart(2, "0")}`;
 }
 function fmtDistance(m) {
   if (!m) return "–";
-  return `${(m / 1000).toFixed(1)} km`;
+  return `${(m / 1000).toFixed(2)} km`;
 }
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString("nl-NL", { day: "2-digit", month: "short", year: "numeric" });
@@ -33,9 +36,66 @@ function fmtPace(secPerKm) {
   const s = Math.round(secPerKm % 60);
   return `${m}:${String(s).padStart(2, "0")}/km`;
 }
+function fmtDateTime(iso) {
+  return new Date(iso).toLocaleString("nl-NL", {
+    day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+}
+
+function ActivityRow({ a }) {
+  const [open, setOpen] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
+  const pace = a.distance_m && a.duration_s ? a.duration_s / (Number(a.distance_m) / 1000) : null;
+
+  return (
+    <div style={{ borderBottom: "1px solid var(--line)" }}>
+      <div
+        className="activity-row"
+        style={{ borderBottom: "none", cursor: "pointer" }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={`dot ${a.provider === "polar" ? "polar" : "garmin"}`} />
+        <div>
+          <div className="activity-sport">{a.sport || a.source_sport || "activiteit"}</div>
+          <div className="activity-date">{fmtDate(a.start_time)}</div>
+        </div>
+        <div className="readout hide-mobile">{fmtDistance(a.distance_m)}</div>
+        <div className="readout hide-mobile">{fmtDuration(a.duration_s)}</div>
+        <div className="readout hide-mobile">{a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : "–"}</div>
+        <div className="readout">{open ? "▲" : "▼"}</div>
+      </div>
+
+      {open && (
+        <div style={{ padding: "4px 4px 20px 26px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 14 }}>
+          <div><div className="stat-label">datum & tijd</div><div className="readout" style={{ fontSize: 14 }}>{fmtDateTime(a.start_time)}</div></div>
+          <div><div className="stat-label">bron</div><div className="readout" style={{ fontSize: 14 }}>{a.provider === "polar" ? "Polar" : "Garmin/Strava"}</div></div>
+          <div><div className="stat-label">sport</div><div className="readout" style={{ fontSize: 14 }}>{a.source_sport || a.sport || "–"}</div></div>
+          <div><div className="stat-label">afstand</div><div className="readout" style={{ fontSize: 14 }}>{fmtDistance(a.distance_m)}</div></div>
+          <div><div className="stat-label">tijd</div><div className="readout" style={{ fontSize: 14 }}>{fmtDuration(a.duration_s)}</div></div>
+          {pace && <div><div className="stat-label">tempo</div><div className="readout" style={{ fontSize: 14 }}>{fmtPace(pace)}</div></div>}
+          <div><div className="stat-label">gem. hartslag</div><div className="readout" style={{ fontSize: 14 }}>{a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : "–"}</div></div>
+          <div><div className="stat-label">max. hartslag</div><div className="readout" style={{ fontSize: 14 }}>{a.max_hr ? `${Math.round(a.max_hr)} bpm` : "–"}</div></div>
+          {a.elevation_gain_m > 0 && <div><div className="stat-label">hoogtemeters</div><div className="readout" style={{ fontSize: 14 }}>{Math.round(a.elevation_gain_m)} m</div></div>}
+          <div><div className="stat-label">calorieën</div><div className="readout" style={{ fontSize: 14 }}>{a.calories ? Math.round(a.calories) : "–"}</div></div>
+          {a.training_load != null && <div><div className="stat-label">training load</div><div className="readout" style={{ fontSize: 14 }}>{Number(a.training_load).toFixed(1)}</div></div>}
+          {a.running_index != null && <div><div className="stat-label">running index</div><div className="readout" style={{ fontSize: 14 }}>{a.running_index}</div></div>}
+          <div style={{ gridColumn: "1/-1", marginTop: 4 }}>
+            <button className="btn" style={{ fontSize: 11, padding: "4px 10px" }} onClick={(e) => { e.stopPropagation(); setShowRaw((v) => !v); }}>
+              {showRaw ? "verberg ruwe data" : "toon ruwe data"}
+            </button>
+            {showRaw && (
+              <pre style={{ marginTop: 10, background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 8, padding: 12, fontSize: 11, color: "var(--text-dim)", overflowX: "auto", maxWidth: "100%" }}>
+                {JSON.stringify(a.raw ?? "(niet meegestuurd door /api/activities)", null, 2)}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Brede categorie op basis van het sportlabel, voor grafieken/PR's.
-// (Doelen gebruiken het exacte, ruwe sportlabel — dat blijft los hiervan.)
 function sportCategory(sport) {
   const s = (sport || "").toLowerCase();
   if (s.includes("run")) return "hardlopen";
@@ -343,17 +403,7 @@ export default function Dashboard() {
           {selectedWeek.activities.length > 0 && (
             <div className="activity-list" style={{ marginTop: 16 }}>
               {selectedWeek.activities.map((a) => (
-                <div className="activity-row" key={`wk-${a.provider}-${a.id}`}>
-                  <span className={`dot ${a.provider === "polar" ? "polar" : "garmin"}`} />
-                  <div>
-                    <div className="activity-sport">{a.sport || a.source_sport || "activiteit"}</div>
-                    <div className="activity-date">{fmtDate(a.start_time)}</div>
-                  </div>
-                  <div className="readout hide-mobile">{fmtDistance(a.distance_m)}</div>
-                  <div className="readout hide-mobile">{fmtDuration(a.duration_s)}</div>
-                  <div className="readout hide-mobile">{a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : "–"}</div>
-                  <div className="readout">{a.training_load ? Math.round(a.training_load) : "–"}</div>
-                </div>
+                <ActivityRow a={a} key={`wk-${a.provider}-${a.id}`} />
               ))}
             </div>
           )}
@@ -604,17 +654,7 @@ export default function Dashboard() {
       ) : (
         <div className="activity-list">
           {activities.map((a) => (
-            <div className="activity-row" key={`${a.provider}-${a.id}`}>
-              <span className={`dot ${a.provider === "polar" ? "polar" : "garmin"}`} />
-              <div>
-                <div className="activity-sport">{a.sport || a.source_sport || "activiteit"}</div>
-                <div className="activity-date">{fmtDate(a.start_time)}</div>
-              </div>
-              <div className="readout hide-mobile">{fmtDistance(a.distance_m)}</div>
-              <div className="readout hide-mobile">{fmtDuration(a.duration_s)}</div>
-              <div className="readout hide-mobile">{a.avg_hr ? `${Math.round(a.avg_hr)} bpm` : "–"}</div>
-              <div className="readout">{a.training_load ? Math.round(a.training_load) : "–"}</div>
-            </div>
+            <ActivityRow a={a} key={`${a.provider}-${a.id}`} />
           ))}
         </div>
       )}
