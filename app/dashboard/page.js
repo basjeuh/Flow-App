@@ -197,7 +197,7 @@ function ActivityRow({ a }) {
 function sportCategory(sport) {
   const s = (sport || "").toLowerCase();
   if (s.includes("run")) return "hardlopen";
-  if (s.includes("ride") || s.includes("cycl") || s.includes("bike")) return "fietsen";
+  if (s.includes("ride") || s.includes("cycl") || s.includes("bik")) return "fietsen";
   return "overig";
 }
 const CATEGORY_COLOR = { hardlopen: "var(--garmin)", fietsen: "var(--polar)", overig: "var(--accent)" };
