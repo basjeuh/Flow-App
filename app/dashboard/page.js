@@ -78,12 +78,13 @@ function ActivityRow({ a }) {
       const dDist = (cur.dist ?? 0) - (prev.dist ?? 0);
       const dT = cur.t - prev.t;
       const paceMinKm = dDist > 0 && dT > 0 ? (dT / dDist) * (1000 / 60) : null;
+      const speedMs = cur.speed_ms ?? (dDist > 0 && dT > 0 ? dDist / dT : null);
       out.push({
         t: cur.t,
         hr: cur.hr,
         cadence: cur.cadence,
         watts: cur.watts,
-        speedKmh: cat !== "hardlopen" && cur.speed_ms != null ? +(cur.speed_ms * 3.6).toFixed(1) : null,
+        speedKmh: cat !== "hardlopen" && speedMs != null ? +(speedMs * 3.6).toFixed(1) : null,
         pace: cat === "hardlopen" && paceMinKm && paceMinKm < 15 ? +paceMinKm.toFixed(2) : null,
       });
     }
